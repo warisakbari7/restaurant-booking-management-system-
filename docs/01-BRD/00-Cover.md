@@ -2,35 +2,40 @@
 
 ## Business Requirements Document (BRD)
 
-**Version:** 1.0
+---
 
-**Document Status:** Draft
+### Project Information
 
-**Prepared By:** Waris Akbari
-
-**Project Type:** Full-Stack Web Application
-
-**Technology Stack:**
-
-* Frontend: Next.js
-* Backend: Laravel
-* Database: MySQL
-* Styling: Tailwind CSS
-* Authentication: Laravel Sanctum
-* Version Control: Git & GitHub
-* Deployment: Docker
-
-**Document Date:** July 2026
+| Item                 | Details                               |
+| -------------------- | ------------------------------------- |
+| **Project Name**     | Restaurant Booking Management System  |
+| **Project Type**     | Full-Stack Web Application            |
+| **Version**          | 1.0                                   |
+| **Status**           | Draft                                 |
+| **Author**           | Waris Akbari                          |
+| **Created On**       | July 2026                             |
+| **Technology Stack** | Next.js, Laravel, MySQL, Tailwind CSS |
+| **Repository**       | restaurant-booking-management-system  |
 
 ---
 
-## Document Purpose
+## Purpose of This Document
 
-This Business Requirements Document (BRD) defines the business needs, objectives, project scope, stakeholders, and high-level business requirements for the Restaurant Booking Management System (RBMS). It serves as the primary reference for understanding the business goals before software design and implementation begin.
+This Business Requirements Document (BRD) defines the business needs, project scope, stakeholder expectations, and high-level business requirements for the Restaurant Booking Management System (RBMS).
+
+The document serves as the foundation for the Software Requirements Specification (SRS), system design, implementation, testing, and deployment.
 
 ---
 
-## Confidentiality Statement
+## Document Status
 
-This document has been prepared for educational and portfolio purposes. It demonstrates a structured software engineering approach to requirements analysis and system planning for a fictional restaurant business scenario.
+This document is maintained throughout the analysis phase of the project. Updates are version-controlled using Git and GitHub.
+
+---
+
+## Revision History
+
+| Version | Date      | Author       | Description     |
+| ------- | --------- | ------------ | --------------- |
+| 1.0     | July 2026 | Waris Akbari | Initial version |
 
