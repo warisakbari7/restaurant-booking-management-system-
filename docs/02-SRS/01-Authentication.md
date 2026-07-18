@@ -182,5 +182,152 @@ The system shall allow a registered customer to securely authenticate using thei
 * Invalid credentials are rejected.
 * Passwords are never compared in plain text.
 * Protected pages require authentication.
+---
 
+# FR-003 – User Logout
+
+## Description
+
+The system shall allow an authenticated customer to securely log out of the application.
+
+---
+
+## Actors
+
+* Authenticated Customer
+
+---
+
+## Preconditions
+
+* The customer is authenticated.
+* A valid session or API token exists.
+
+---
+
+## Main Flow
+
+1. The customer clicks the **Logout** button.
+2. The system receives the logout request.
+3. The system invalidates the current session or revokes the active API token.
+4. The system clears any authentication-related data.
+5. The customer is redirected to the login page.
+
+---
+
+## Alternative Flows
+
+### AF-001 – Unauthorized Request
+
+* If the customer is not authenticated, the system denies the request.
+* The system returns an unauthorized response.
+
+---
+
+## Postconditions
+
+* The customer is no longer authenticated.
+* The session or API token is no longer valid.
+* Protected resources cannot be accessed until the customer logs in again.
+
+---
+
+## Business Rules
+
+* BR-03
+* BR-22
+
+---
+
+## Acceptance Criteria
+
+* An authenticated customer can successfully log out.
+* The session or API token is invalidated after logout.
+* Access to protected pages requires a new login after logout.
+
+---
+
+# FR-004 – Change Password
+
+## Description
+
+The system shall allow an authenticated customer to change their password after verifying their current password.
+
+---
+
+## Actors
+
+* Authenticated Customer
+
+---
+
+## Preconditions
+
+* The customer is authenticated.
+* The customer knows their current password.
+
+---
+
+## Input Data
+
+| Field                | Required | Validation                      |
+| -------------------- | -------- | ------------------------------- |
+| Current Password     | Yes      | Must match the current password |
+| New Password         | Yes      | Minimum 8 characters            |
+| Confirm New Password | Yes      | Must match the new password     |
+
+---
+
+## Main Flow
+
+1. The customer opens the Change Password page.
+2. The customer enters the current password.
+3. The customer enters the new password.
+4. The customer confirms the new password.
+5. The customer submits the form.
+6. The system validates the input.
+7. The system verifies that the current password is correct.
+8. The system hashes the new password.
+9. The system updates the stored password.
+10. The system displays a success message.
+
+---
+
+## Alternative Flows
+
+### AF-001 – Incorrect Current Password
+
+* The current password does not match the stored password.
+* The password is not changed.
+* The system displays an error message.
+
+### AF-002 – Validation Failure
+
+* One or more fields are invalid.
+* The password is not changed.
+* The system displays validation errors.
+
+---
+
+## Postconditions
+
+* The customer's password has been updated.
+* The old password is no longer valid.
+* The new password can be used for future logins.
+
+---
+
+## Business Rules
+
+* BR-22
+* BR-24
+
+---
+
+## Acceptance Criteria
+
+* The customer must provide the correct current password.
+* The new password is stored as a hash.
+* The old password cannot be used after the change.
+* The customer receives confirmation that the password was changed successfully.
 
