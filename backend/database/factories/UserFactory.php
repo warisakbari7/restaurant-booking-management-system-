@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Models\Role;
 
 /**
  * @extends Factory<User>
@@ -24,22 +25,26 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        $role_id = Role::where('name','Customer')->first()->id;
         return [
-            'name' => fake()->name(),
+            'first_name' => fake()->firstname(),
+            'last_name' => fake()->lastname(),
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
+            // 'email_verified_at' => now(),
+            'role_id' => $role_id,
+            'phone' => fake()->numerify('+49 15########'),
             'password' => static::$password ??= Hash::make('password'),
-            'remember_token' => Str::random(10),
+            // 'remember_token' => Str::random(10),
         ];
     }
 
     /**
      * Indicate that the model's email address should be unverified.
      */
-    public function unverified(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
-    }
+    // public function unverified(): static
+    // {
+    //     return $this->state(fn (array $attributes) => [
+    //         'email_verified_at' => null,
+    //     ]);
+    // }
 }
