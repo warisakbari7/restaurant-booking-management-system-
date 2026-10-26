@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+
     #[Fillable(['user_id','reservation_date','reservation_time',
     'guest_count',
     'status',
@@ -16,7 +18,7 @@ class Reservation extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function restaurantTables()
+    public function tables()
     {
         return $this->belongsToMany(RestaurantTable::class,'reservation_tables');
     }
