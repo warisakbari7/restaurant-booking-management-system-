@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreReservationRequest;
 use App\Services\ReservationService;
+use App\Models\Reservation;
 
 class ReservationController extends Controller
 {
@@ -39,5 +40,16 @@ class ReservationController extends Controller
                 ['message' => $re->getMessage()], 409
             );
         }
+    }
+
+    public function index(Request $request)
+    {
+        $userId = $request->user()->id;
+        $reservations = Reservation::with('tables')->where('user_id', $userId)
+        ->orderByDesc('reservation_date')
+        ->orderByDesc('reservation_time')->get();
+        return response()->json([
+            'reservations' => $reservations,
+            ],200);
     }
 }
