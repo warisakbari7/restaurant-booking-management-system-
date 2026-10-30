@@ -52,4 +52,19 @@ class ReservationController extends Controller
             'reservations' => $reservations,
             ],200);
     }
+
+    public function show(Request $request, int $reservationId)
+    {
+       $reservation = Reservation::with('tables')
+       ->where('user_id',$request->user()->id)
+       ->findOrFail($reservationId);
+
+       return response()->json(
+        [
+            'reservation' => $reservation,
+            'tables' => $reservation->tables,
+        ], 200
+       );
+
+    }
 }
