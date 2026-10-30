@@ -47,7 +47,7 @@ class ReservationController extends Controller
         $userId = $request->user()->id;
         $reservations = Reservation::with('tables')->where('user_id', $userId)
         ->orderByDesc('reservation_date')
-        ->orderByDesc('reservation_time')->get();
+        ->orderByDesc('reservation_time')->paginate(10);
         return response()->json([
             'reservations' => $reservations,
             ],200);
