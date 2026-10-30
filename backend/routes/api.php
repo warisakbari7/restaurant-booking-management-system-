@@ -15,3 +15,4 @@ Route::middleware('auth:sanctum')->post(
 
 Route::middleware('auth:sanctum')->get('/reservations', [ReservationController::class, 'index']);
 Route::middleware('auth:sanctum')->get('/reservations/{reservationId}', [ReservationController::class, 'show']);
+Route::middleware('auth:sanctum')->patch('/reservations/{reservationId}/cancel', [ReservationController::class, 'cancel']);

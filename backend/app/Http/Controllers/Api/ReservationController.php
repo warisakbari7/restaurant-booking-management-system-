@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Http\Requests\StoreReservationRequest;
 use App\Services\ReservationService;
 use App\Models\Reservation;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class ReservationController extends Controller
 {
@@ -66,5 +68,28 @@ class ReservationController extends Controller
         ], 200
        );
 
+    }
+
+    public function cancel(Request $request, int $reservationId, ReservationService $reservationService)
+    {
+        $userId = $request->user()->id;
+        $updatedReservation = $reservationService->cancelReservation($userId, $reservationId);
+        if($updatedReservation !== null)
+            {
+                return response()->json(
+                    [
+                        'success' => true,
+                        'message' => 'Reservation cancelled successfully.',
+                        'reservation' => $updatedReservation,
+                        'tables' => $updatedReservation->tables
+                    ], 200
+                );
+            }
+        return response()->json(
+            [
+                'success' => false,
+                'message' => 'This reservation cannot be cancelled.'
+            ], 409
+        );
     }
 }

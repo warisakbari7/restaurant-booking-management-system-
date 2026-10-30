@@ -181,4 +181,32 @@
             return 0;
         }
 
+        public function cancelReservation(int $userId, int $reservationId)
+        {
+            return DB::transaction(function() use($userId, $reservationId)
+            {
+                $reservation = Reservation::where('id', $reservationId)
+                ->where('user_id', $userId)->lockForUpdate()->firstOrFail();
+                if(!in_array($reservation->status, ['Pending', 'Confirmed'], true))
+                    {
+                        return null;
+                    }
+                
+                $deadlineCancellation = config('restaurant.rules.cancellation_deadline_minutes');
+                        
+                $reservationTime = Carbon::parse($reservation->reservation_date . ' ' . $reservation->reservation_time);
+                $cancellationDeadline = $reservationTime->copy()
+                    ->subMinutes($deadlineCancellation);
+                if(now()->greaterThan($cancellationDeadline))
+                    {
+                       return null;
+                    }
+                $reservation->status = 'Cancelled';
+                $reservation->save();
+                $reservation->load('tables');
+                                
+                return $reservation;
+            });
+        }
+
     }
