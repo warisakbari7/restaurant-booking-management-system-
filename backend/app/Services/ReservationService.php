@@ -60,32 +60,30 @@
             return $reservation;
         }
 
-        public function selectTablesForReservation(string $date, string $time, int $guestCount)
+        public function selectTablesForReservation(string $date, string $time, int $guestCount, ?int $excludeReservationId = null)
         {
-            $tables = $this->findAvailableTables($date, $time, $guestCount);
-            $tables =  $this->setTables($tables, $guestCount);
-            if($tables == null)
-                return null;
-
-            return $tables;
-
+            $tables = $this->findAvailableTables($date, $time, $excludeReservationId);
+            return   $this->setTables($tables, $guestCount);
         }
 
 
-        public function findAvailableTables(string $date, string $time, int $guestCount)
+        public function findAvailableTables(string $date, string $time, ?int $excludeReservationId = null)
         {
 
             ['startTime' => $startTime,
-            'endTime' => $endTime,
             'blockedUntil' => $blockedUntil]= $this->calculateReservationTime($time, $date);
 
             $duration = config('restaurant.rules.reservation_duration_minutes');
             $duration += config('restaurant.rules.turnover_minutes');
 
-            $tables = RestaurantTable::whereDoesntHave('reservations',function($query) use ($startTime, $blockedUntil,$duration){
+            $tables = RestaurantTable::whereDoesntHave('reservations',function($query) use ($startTime, $blockedUntil, $duration, $excludeReservationId){
                 $query->whereNotIn('status',['Cancelled','No Show'])
                 ->whereRaw('TIMESTAMP(reservations.reservation_date, reservations.reservation_time) < ?',[$blockedUntil])
                 ->whereRaw("? < TIMESTAMPADD(MINUTE,?,TIMESTAMP(reservations.reservation_date, reservations.reservation_time))",[$startTime,$duration]);
+                if($excludeReservationId !== null)
+                    {
+                        $query->where('reservations.id', '!=', $excludeReservationId);
+                    }
                 })->where('status','!=','Out of Service')->get();
                 return $tables;
         }
@@ -209,4 +207,66 @@
             });
         }
 
+        public function updateReservation(int $userId, int $reservationId, string $date, string $time, int $guestCount, ?string $specialRequests)
+        {
+
+            if($guestCount <= 0 || $guestCount > config('restaurant.rules.max_guests'))
+                throw new InvalidArgumentException('Invalid Guest Amount!');
+
+            if(!Carbon::hasFormat($date,"Y-m-d") || !Carbon::hasFormat($time,"H:i:s"))
+                throw new InvalidArgumentException('Date must use Y-m-d format and time must use H:i:s format.');
+            $parseDate = Carbon::createFromFormat('!Y-m-d',$date);
+            if($parseDate->format('Y-m-d') !== $date)
+            {
+                throw new InvalidArgumentException('The reservation date is not a valid calendar date.');
+            }
+
+            $parseTime = Carbon::createFromFormat('!H:i:s', $time);
+
+            if ($parseTime->format('H:i:s') !== $time)
+            {
+                throw new InvalidArgumentException('The reservation time is invalid.');
+            }
+
+            $dateTime = Carbon::parse("$date $time");
+
+            if($dateTime->isPast())
+                throw new InvalidArgumentException("The reservation date and time must be in future!");
+           
+            
+            $reservation = DB::transaction(function()use($userId, $reservationId, $date, $time, $guestCount,$specialRequests)
+                {
+                    $reservation = Reservation::where('user_id', $userId)->where('id', $reservationId)->lockForUpdate()->firstOrFail();
+                    $deadlineCancellation = config('restaurant.rules.cancellation_deadline_minutes');
+                    $reservationTime = Carbon::parse($reservation->reservation_date . ' ' . $reservation->reservation_time);
+                    $cancellationDeadline = $reservationTime->copy()
+                        ->subMinutes($deadlineCancellation);
+                    if(now()->greaterThan($cancellationDeadline))
+                    {
+                        return null;
+                    }
+                    if(!in_array($reservation->status, ['Pending', 'Confirmed'],true))
+                        return null;
+
+                    $lockedTables = RestaurantTable::query()->orderBy('id')->lockForUpdate()->get();
+                    $tables = $this->selectTablesForReservation($date, $time, $guestCount, $reservationId);
+                    if($tables === null)
+                    throw new RuntimeException('No suitable table found.');
+
+               
+                    $reservation->reservation_date = $date;
+                    $reservation->reservation_time = $time;
+                    $reservation->guest_count = $guestCount;
+                    $reservation->special_requests = $specialRequests;
+                    $reservation->save();
+                    $reservation->tables()->sync($tables->pluck('id')->all());
+                    $reservation->load('tables');
+                    return $reservation;
+
+                });
+            return $reservation; 
+            
+        }
+
     }
+
