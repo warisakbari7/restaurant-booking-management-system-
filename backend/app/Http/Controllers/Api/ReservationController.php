@@ -9,6 +9,8 @@ use App\Services\ReservationService;
 use App\Models\Reservation;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Http\Requests\UpdateReservationRequest;
+use PhpParser\Node\Stmt\TryCatch;
 
 class ReservationController extends Controller
 {
@@ -91,5 +93,55 @@ class ReservationController extends Controller
                 'message' => 'This reservation cannot be cancelled.'
             ], 409
         );
+    }
+
+    public function update(UpdateReservationRequest $request, $reservationId, ReservationService $service)
+    {
+        $validated = $request->validated();
+        try
+        {
+            $reservation = $service->updateReservation(
+                $request->user()->id,
+                $reservationId,
+                $validated['reservation_date'],
+                $validated['reservation_time'],
+                $validated['guest_count'],
+                $validated['special_requests'] ?? null
+            );
+            if($reservation === null)
+                return response()->json(['message' => 'This reservation can no longer be modified.'], 409);
+            $reservation->load('tables');
+            return response()->json(
+                [
+                    'message' => 'Reservation updated successfully',
+                    'reservation' => $reservation,
+                    'tables' => $reservation->tables
+                ], 200
+            );
+        }
+        catch( \Illuminate\Database\Eloquent\ModelNotFoundException $e)
+        {
+            return response()->json(
+                [
+                    'message' => 'Reservation not found.'
+                ], 404
+            );
+        }
+
+        catch (\InvalidArgumentException $e)
+        {
+            return response()->json([
+            'message' => $e->getMessage()
+            ], 422);
+        }
+
+        catch( \RuntimeException $e)
+        {
+            return response()->json(
+                [
+                    'message' => $e->getMessage()
+                ], 409
+            );
+        }
     }
 }
