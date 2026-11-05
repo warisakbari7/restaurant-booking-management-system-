@@ -324,4 +324,55 @@ class ReservationApiTest extends TestCase
             'status' => 'Pending'
         ]);
     }
+
+    public function test_a_user_cannot_cancel_another_users_reservation() : void
+    {
+        $user1 = User::factory()->create();
+        $user2 = User::factory()->create();
+        $dateTime = Carbon::now()->addDays(1);
+        $reservation = Reservation::factory()->create(
+        [  
+            'user_id' => $user1->id,
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 1,
+            'status' => 'Pending'
+        ]);
+        Sanctum::actingAs($user2);
+        $response = $this->patchJson("/api/reservations/{$reservation->id}/cancel");
+        $response->assertStatus(404);
+        $this->assertDatabaseHas('reservations',
+        [
+            'user_id' => $user1->id,
+            'id' => $reservation->id,
+            'status' => 'Pending'
+        ]);
+    }
+
+    public function test_unauthenticated_user_cannot_cancel_reservations() : void
+    {
+        $user = User::factory()->create();
+        $dateTime = Carbon::now()->addDays(1);
+        $reservation = Reservation::factory()->create(
+            [
+                'user_id' => $user->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 4,
+                'status' => 'Pending'
+            ]
+        );
+
+        $response = $this->patchJson("/api/reservations/{$reservation->id}/cancel");
+        $response->assertUnauthorized();
+        $this->assertDatabaseHas('reservations',
+        [
+            'user_id' => $user->id,
+            'id' => $reservation->id,
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 4,
+            'status' => 'Pending'
+        ]);
+    }
 }
