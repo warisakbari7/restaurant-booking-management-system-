@@ -20,10 +20,11 @@ class ReservationApiTest extends TestCase
      */
     public function test_unauthenticated_user_cannot_create_reservation(): void
     {
+        $dateTime = Carbon::now()->addDays(1);
         $response = $this->postJson('/api/reservations', 
         [
-            'reservation_date' => '2026-11-10',
-            'reservation_time' => '14:30:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 5,
             'special_requests' => null
 
@@ -36,10 +37,11 @@ class ReservationApiTest extends TestCase
     {
             $user = User::factory()->create();
             Sanctum::actingAs($user);
+            $dateTime = Carbon::now()->addDays(1);
             $response = $this->postJson('/api/reservations',
             [
-                'reservation_date' => '2026-11-10',
-                'reservation_time' => '14:30:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
                 'guest_count' => 5,
                 'special_requests' => 'Window seat preferred'
             ]);
@@ -51,8 +53,8 @@ class ReservationApiTest extends TestCase
             $this->assertDatabaseHas('reservations',
             [
                 'user_id' => $user->id,
-                'reservation_date' => '2026-11-10',
-                'reservation_time' => '14:30:00',
+                'reservation_date' => $response->json('reservation.reservation_date'),
+                'reservation_time' => $response->json('reservation.reservation_time'),
                 'guest_count' => 5,
                 'special_requests' => 'Window seat preferred'
             ]);
@@ -62,10 +64,11 @@ class ReservationApiTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
+        $dateTime = Carbon::now()->addDays(1);
         $response = $this->postJson('/api/reservations',
         [
-            'reservation_date' => '2026-11-11',
-            'reservation_time' => '13:00:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 5,
         ]);
         $response->assertCreated();
@@ -75,8 +78,8 @@ class ReservationApiTest extends TestCase
         $this->assertDatabaseHas('reservations',
         [
             'user_id' => $user->id,
-            'reservation_date' => '2026-11-11',
-            'reservation_time' => '13:00:00',
+            'reservation_date' => $response->json('reservation.reservation_date'),
+            'reservation_time' => $response->json('reservation.reservation_time'),
             'guest_count' => 5,
         ]);
         $tables = $response->json('tables');
@@ -100,22 +103,24 @@ class ReservationApiTest extends TestCase
 
     public function test_overlapping_reservations_are_not_assigned_the_same_tables() : void
     {
-                $user1 = User::factory()->create();
+        $user1 = User::factory()->create();
         $user2 = User::factory()->create();
         Sanctum::actingAs($user1);
+        $dateTime = Carbon::now()->addDays(1);
 
         $response1 = $this->postJson('/api/reservations',
         [
-            'reservation_date' => '2026-11-12',
-            'reservation_time' => '13:00:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 5
         ]);
 
         Sanctum::actingAs($user2);
+        $dateTime->addHours(1);
         $response2 = $this->postJson('/api/reservations',
         [
-            'reservation_date' => '2026-11-12',
-            'reservation_time' => '14:00:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 5
         ]);
 
@@ -132,18 +137,20 @@ class ReservationApiTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
-
+        $dateTime = Carbon::now()->addDays(1);
         $response1 = $this->postJson('/api/reservations',
         [
-            'reservation_date' => '2026-11-13',
-            'reservation_time' => '13:00:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 3,
         ]);
         $response1->assertCreated();
+        $dateTime->addMinutes(135);
+
         $response2 = $this->postJson('/api/reservations',
         [
-            'reservation_date' => '2026-11-13',
-            'reservation_time' => '15:15:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 3,
         ]);
         $response2->assertCreated();
@@ -158,29 +165,30 @@ class ReservationApiTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
+        $dateTime = Carbon::now()->addDays(1);
         $response = $this->postJson('/api/reservations',
         [
-            'reservation_date' => '2026-11-12',
-            'reservation_time' => '12:00:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 2,
             'special_requests' => 'Window seat please.'
         ]);
         $response->assertCreated();
 
 
-
+        $dateTime->addDays(1);
         $reservationId = $response->json('reservation.id');
         $response = $this->patchJson("/api/reservations/{$reservationId}",
         [
-            'reservation_date' => '2026-11-13',
-            'reservation_time' => '11:00:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 3,
             'special_requests' => 'First floor preferred.'
         ]);
         $response->assertOK();
 
-        $response->assertJsonPath('reservation.reservation_date','2026-11-13');
-        $response->assertJsonPath('reservation.reservation_time', '11:00:00');
+        $response->assertJsonPath('reservation.reservation_date',$dateTime->toDateString());
+        $response->assertJsonPath('reservation.reservation_time', $dateTime->format('H:i:s'));
         $response->assertJsonPath('reservation.guest_count', 3);
         $response->assertJsonPath('reservation.special_requests','First floor preferred.');
         $response->assertJsonPath('reservation.status', 'Pending');
@@ -188,8 +196,8 @@ class ReservationApiTest extends TestCase
         $this->assertDatabaseHas('reservations', 
         [
             'user_id' => $user->id,
-            'reservation_date' => '2026-11-13',
-            'reservation_time' => '11:00:00',
+            'reservation_date' => $response->json('reservation.reservation_date'),
+            'reservation_time' => $response->json('reservation.reservation_time'),
             'guest_count' => 3,
             'special_requests' => 'First floor preferred.'
         ]);
@@ -200,19 +208,21 @@ class ReservationApiTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
+        $dateTime = Carbon::now()->addDays(1);
         $response = $this->postJson('/api/reservations',
         [
-            'reservation_date' => '2026-11-13',
-            'reservation_time' => '10:00:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 2,
             'special_requests' => 'Well decorated table.'
         ]);
         $response->assertCreated();
         $reservationId = $response->json('reservation.id');
+        $dateTime->subHours(1);
         $response = $this->patchJson("/api/reservations/{$reservationId}",
         [
-            'reservation_date' => '11-2026-13',
-            'reservation_time' => '09-00-00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 0,
         ]);
         $response->assertUnprocessable();
@@ -228,11 +238,12 @@ class ReservationApiTest extends TestCase
             ]
         );
         Sanctum::actingAs($user2);
+        $dateTime = Carbon::now()->addDays(1);
 
         $response = $this->patchJson("/api/reservations/{$reservation->id}",
         [
-            'reservation_date' => '2026-11-23',
-            'reservation_time' => '10:00:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 3
         ]);
         $response->assertNotFound();
@@ -257,10 +268,11 @@ class ReservationApiTest extends TestCase
             ]
         );
         Sanctum::actingAs($user);
+        $dateTime->addDays(1);
         $response = $this->patchJson("/api/reservations/{$reservation->id}",
         [
-            'reservation_date' => '2026-11-10',
-            'reservation_time' => '20:00:00',
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 1
         ]);
 
@@ -268,5 +280,48 @@ class ReservationApiTest extends TestCase
 
     }
 
+    public function test_authenticated_user_can_cancel_the_reservation() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = Carbon::now()->addDays(1);
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 5
+        ]);
+        $response->assertCreated();
+        $reservationId = $response->json('reservation.id');
+        $response = $this->patchJson("/api/reservations/{$reservationId}/cancel");
+        $response->assertOk();
+        $response->assertJsonPath('reservation.status', 'Cancelled');
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservationId,
+            'status' => 'Cancelled'
+        ]);
+    }
 
+    public function test_a_reservation_cannot_be_cancelled_after_deadline_time() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = Carbon::now()->subDays(1);
+        $reservation = Reservation::factory()->create(
+            [
+                'user_id' => $user->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 3,
+                'status' => 'Pending'
+            ]
+        );
+        $response = $this->patchJson("/api/reservations/{$reservation->id}/cancel");
+        $response->assertStatus(409 );
+        $this->assertDatabaseHas('reservations',[
+            'id' => $reservation->id,
+            'status' => 'Pending'
+        ]);
+    }
 }
