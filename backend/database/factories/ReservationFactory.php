@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Carbon;
 
 /**
  * @extends Factory<Reservation>
@@ -19,10 +20,11 @@ class ReservationFactory extends Factory
     public function definition(): array
     {
         $userId = User::first()->id;
+        $dateTime = Carbon::now()->addDays(1);
         return [
             'user_id' => $userId,
-            'reservation_date' => fake()->date(),
-            'reservation_time' => fake()->time(),
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => fake()->numberBetween(1,8),
             'status' => 'Pending'
         ];

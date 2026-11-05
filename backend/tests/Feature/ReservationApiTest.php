@@ -2,9 +2,7 @@
 
 namespace Tests\Feature;
 
-use Database\Factories\UserFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 use App\Models\User;
@@ -374,5 +372,120 @@ class ReservationApiTest extends TestCase
             'guest_count' => 4,
             'status' => 'Pending'
         ]);
+    }
+
+    public function test_authenticated_user_sees_only_their_reservation() : void
+    {
+        $dateTime = Carbon::now()->addDays(1);
+        $user1 = User::factory()->create();
+        $user2 = User::factory()->create();
+        $reservation1 = Reservation::factory()->create(
+            [
+                'user_id' => $user1->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 3,
+                'status' => 'Pending'
+            ]
+        );
+        $reservation2 = Reservation::factory()->create(
+            [
+                'user_id' => $user2->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 3,
+                'status' => 'Pending'
+            ]
+        );
+        Sanctum::actingAs($user1);
+        $response = $this->getJson('/api/reservations');
+        $response->assertStatus(200);
+        $reservations = $response->json('reservations.data');
+        $returnedIds = collect($reservations)->pluck('id')->all();
+        $this->assertContains($reservation1->id, $returnedIds);
+        $this->assertNotContains($reservation2->id, $returnedIds);
+        foreach($reservations as $reservation)
+            {
+                $this->assertEquals($user1->id, $reservation['user_id']);
+            }
+
+    }
+
+    public function test_unauthenticated_user_cannot_list_reservations() : void
+    {
+        $user = User::factory()->create();
+        $dateTime = Carbon::now()->addDays(1);
+        Reservation::factory()->create(
+            [
+                'user_id' => $user->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 2,
+            ]
+        );
+         $response = $this->getJson('/api/reservations');
+         $response->assertUnauthorized();
+    }
+
+    public function test_user_can_view_thier_reservaton_details() : void
+    {
+        $user = User::factory()->create();
+        $dateTime = Carbon::now()->addDays(1);
+        Sanctum::actingAs($user);
+        $reservation = Reservation::factory()->create(
+            [
+                'user_id' => $user->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 5
+            ]
+        );
+
+        $response = $this->getJson("/api/reservations/{$reservation->id}");
+        $response->assertOk();
+        $response->assertJsonPath('reservation.user_id', $user->id);
+        $response->assertJsonPath('reservation.id', $reservation->id);
+        $response->assertJsonPath('reservation.reservation_date', $reservation->reservation_date);
+        $response->assertJsonPath('reservation.reservation_time', $reservation->reservation_time);
+        $response->assertJsonPath('reservation.guest_count', $reservation->guest_count);
+        $response->assertJsonPath('reservation.status', 'Pending');
+
+
+    }
+
+    public function test_user_cannot_view_others_reservation_details() : void
+    {
+        $user1 = User::factory()->create();
+        $user2 = User::factory()->create();
+        $dateTime = Carbon::now()->addDays(1);
+        $reservation1 = Reservation::factory()->create(
+            [
+                'user_id' => $user1->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 3,
+            ]
+        );
+     
+        Sanctum::actingAs($user2);
+        $response= $this->getJson("/api/reservations/{$reservation1->id}");
+        $response->assertNotFound();
+    }
+
+    public function test_unauthenticated_user_cannot_view_details_of_reservation() : void
+    {
+        $user = User::factory()->create();
+        $dateTime = Carbon::now()->addDay();
+        $reservation = Reservation::factory()->create(
+            [
+                'user_id' => $user->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 3
+            ]
+        );
+
+        $response = $this->getJson("/api/reservations/{$reservation->id}");
+        $response->assertUnauthorized();
     }
 }
