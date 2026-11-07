@@ -7,6 +7,7 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\Reservation;
+use App\Models\RestaurantTable;
 use Illuminate\Support\Carbon;
 
 class ReservationApiTest extends TestCase
@@ -488,4 +489,36 @@ class ReservationApiTest extends TestCase
         $response = $this->getJson("/api/reservations/{$reservation->id}");
         $response->assertUnauthorized();
     }
+
+    public function test_a_reservation_cannot_be_created_when_tables_are_unavailable() : void
+    {
+
+        $this->assertDatabaseHas('restaurant_tables', [
+            'status' => 'Available',
+        ]);
+        RestaurantTable::where('status', 'Available')->update(
+            [
+                'status' => 'Out of Service'
+            ]
+        );
+        $dateTime = Carbon::now()->addDay();
+        $user = User::factory()->create();
+        Sanctum::actingAS($user);
+        $reservationCount = Reservation::count();
+        
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 3
+        ]);
+        $response->assertStatus(409);
+        $this->assertEquals($reservationCount, Reservation::count());
+        $response->assertJson(
+            [
+                'message' => 'No suitable table found.'
+            ]
+        );
+       
+    }    
 }
