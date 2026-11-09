@@ -538,4 +538,22 @@ class ReservationApiTest extends TestCase
         $response->assertUnprocessable();
         $this->assertEquals($reservationCount, Reservation::count());
     }
+
+    public function test_a_reservation_cannot_be_created_with_zero_guest_count() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = Carbon::now()->addDay();
+        $reservationCount = Reservation::count();
+        $response = $this->postJson('/api/reservations',
+        [
+            'user_id' => $user->id,
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 0
+        ]);
+        $response->assertUnprocessable();
+        $this->assertEquals($reservationCount, Reservation::count());
+
+    }
 }
