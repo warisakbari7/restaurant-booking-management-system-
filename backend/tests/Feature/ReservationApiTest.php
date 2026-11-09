@@ -532,7 +532,6 @@ class ReservationApiTest extends TestCase
         [
             'reservation_date' => $dateTime->toDateString(),
             'reservation_time' => $dateTime->format('H:i:s'),
-            'user_id' => $user->id,
             'guest_count' => 9,
         ]);
         $response->assertUnprocessable();
@@ -547,7 +546,6 @@ class ReservationApiTest extends TestCase
         $reservationCount = Reservation::count();
         $response = $this->postJson('/api/reservations',
         [
-            'user_id' => $user->id,
             'reservation_date' => $dateTime->toDateString(),
             'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 0
@@ -555,5 +553,37 @@ class ReservationApiTest extends TestCase
         $response->assertUnprocessable();
         $this->assertEquals($reservationCount, Reservation::count());
 
+    }
+
+    public function test_a_reservation_cannot_be_created_with_invalid_date() : void
+    {
+        $user = User::factory()->create();
+        $dateTime = Carbon::now()->subDay();
+        Sanctum::actingAs($user);
+        $reservationCount = Reservation::count();
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 5
+        ]);
+        $response->assertUnprocessable();
+        $this->assertEquals($reservationCount, Reservation::count());
+    }
+
+    public function test_a_reservation_creation_will_be_rejected_with_requested_time_in_past() : void
+    {
+        $user = User::factory()->create();
+        $dateTime = Carbon::now()->subHour();
+        Sanctum::actingAs($user);
+        $reservationCount = Reservation::count();
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 5
+        ]);
+        $response->assertUnprocessable();
+        $this->assertEquals($reservationCount, Reservation::count());
     }
 }
