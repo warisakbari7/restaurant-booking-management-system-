@@ -520,5 +520,22 @@ class ReservationApiTest extends TestCase
             ]
         );
        
-    }    
+    }
+
+    public function test_a_reservation_cannot_be_created_for_more_than_8_guests() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = Carbon::now()->addDay();
+        $reservationCount = Reservation::count();
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'user_id' => $user->id,
+            'guest_count' => 9,
+        ]);
+        $response->assertUnprocessable();
+        $this->assertEquals($reservationCount, Reservation::count());
+    }
 }
