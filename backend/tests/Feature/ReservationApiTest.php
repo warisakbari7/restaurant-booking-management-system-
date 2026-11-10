@@ -586,4 +586,29 @@ class ReservationApiTest extends TestCase
         $response->assertUnprocessable();
         $this->assertEquals($reservationCount, Reservation::count());
     }
+
+    public function test_reservation_cancellation_in_earliest_boundary() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $this->travelTo(now()->setSeconds(0)->setMicrosecond(0));
+        $dateTime = now()->addMinutes(120);
+
+        $response = $this->postJson("/api/reservations",
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 3
+        ]);
+        $response->assertCreated();
+        $reservationId = $response->json('reservation.id');
+        $response = $this->patchJson("/api/reservations/$reservationId/cancel");
+        $response->assertOk();
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservationId,
+            'status' => 'Cancelled'
+        ]);
+        $response->dump();
+    }
 }
