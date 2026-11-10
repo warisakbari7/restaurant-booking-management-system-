@@ -611,4 +611,53 @@ class ReservationApiTest extends TestCase
         ]);
         $response->dump();
     }
+
+    public function test_completed_reservation_cannot_be_cancelled() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = now();
+        $reservation = Reservation::create(
+            [
+                'user_id' => $user->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 3,
+                'status' => 'Completed'
+            ]
+        );
+
+        $response = $this->patchJson("/api/reservations/{$reservation->id}/cancel");
+        $response->assertConflict();
+        $this->assertDatabaseHas('reservations',
+        [
+            'status' => 'Completed',
+            'id' => $reservation->id
+        ]);
+
+    }
+    public function test_no_show_reservation_cannot_be_cancelled() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = now();
+        $reservation = Reservation::create(
+            [
+                'user_id' => $user->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 3,
+                'status' => 'No Show'
+            ]
+        );
+
+        $response = $this->patchJson("/api/reservations/{$reservation->id}/cancel");
+        $response->assertConflict();
+        $this->assertDatabaseHas('reservations',
+        [
+            'status' => 'No Show',
+            'id' => $reservation->id
+        ]);
+
+    }
 }
