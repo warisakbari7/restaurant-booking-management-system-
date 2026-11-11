@@ -616,7 +616,7 @@ class ReservationApiTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
-        $dateTime = now();
+        $dateTime = now()->addDay();
         $reservation = Reservation::create(
             [
                 'user_id' => $user->id,
@@ -636,11 +636,12 @@ class ReservationApiTest extends TestCase
         ]);
 
     }
+
     public function test_no_show_reservation_cannot_be_cancelled() : void
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
-        $dateTime = now();
+        $dateTime = now()->addDay();
         $reservation = Reservation::create(
             [
                 'user_id' => $user->id,
@@ -658,6 +659,93 @@ class ReservationApiTest extends TestCase
             'status' => 'No Show',
             'id' => $reservation->id
         ]);
+
+    }
+
+    public function test_a_user_cannot_update_reservation_to_accomodate_more_than_8_guests() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = now()->addDay();
+        $reservation = Reservation::create(
+            [
+                'user_id' => $user->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 3
+            ]
+        );
+        $response = $this->patchJson("/api/reservations/$reservation->id",
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 9,
+        ]);
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('guest_count');
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservation->id,
+            'guest_count' => 3
+        ]);
+    }
+
+    public function test_user_cannot_update_a_reservation_to_0_guest() : void 
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = now()->addDay();
+        $reservation  = Reservation::create(
+            [
+                'user_id' => $user->id,
+                'reservation_date' => $dateTime->toDateString(),
+                'reservation_time' => $dateTime->format('H:i:s'),
+                'guest_count' => 3,
+            ]
+        );
+        $response = $this->patchJson("/api/reservations/{$reservation->id}",
+        [
+            'reservation_date' => $reservation->reservation_date,
+            'reservation_time' => $reservation->reservation_time,
+            'guest_count' => 0
+        ]);
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('guest_count');
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservation->id,
+            'guest_count' => 3,
+        ]);
+    }
+
+    public function test_reservation_cannot_be_updated_to_date_in_the_past() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $originalDateTime = now()->addDay();
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $originalDateTime->toDateString(),
+            'reservation_time' => $originalDateTime->format('H:i:s'),
+            'guest_count' => 3
+        ]);
+        $response->assertCreated();
+        $reservationId = $response->json('reservation.id');
+        $dateTime = now()->subDays(2);
+        $response = $this->patchJson("/api/reservations/{$reservationId}",
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format("H:i:s"),
+            'guest_count' => 3
+        ]);
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('reservation_date');
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservationId,
+            'reservation_date' => $originalDateTime->toDateString()
+        ]);
+
 
     }
 }
