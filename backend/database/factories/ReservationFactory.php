@@ -20,7 +20,7 @@ class ReservationFactory extends Factory
     public function definition(): array
     {
         $userId = User::first()->id;
-        $dateTime = Carbon::now()->addDays(1);
+        $dateTime = now()->addDay()->addHours(2);
         return [
             'user_id' => $userId,
             'reservation_date' => $dateTime->toDateString(),

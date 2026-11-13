@@ -22,7 +22,7 @@ class RestaurantTableSeeder extends Seeder
                     ($num >= 7 && $num <= 12 || $num >= 18 && $num <= 22 ) => 4,
                    default => 6 
                 },
-                'Status' => 'Available',
+                'status' => 'Available',
                 'floor' => ($num < 16) ? 'Ground Floor' : 'First Floor', 
             ]);
          }

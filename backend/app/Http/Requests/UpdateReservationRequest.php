@@ -25,7 +25,7 @@ class UpdateReservationRequest extends FormRequest
         $maxGuestCount = config('restaurant.rules.max_guests');
 
         return [
-            'reservation_date' => ['required', 'date_format:Y-m-d','after:now'],
+            'reservation_date' => ['required', 'date_format:Y-m-d','after_or_equal:today'],
             'reservation_time' => ['required', 'date_format:H:i:s'],
             'guest_count' => ['integer', 'required', 'min:1', "max:$maxGuestCount"],
             'special_requests' => ['nullable', 'string', 'max:1000']

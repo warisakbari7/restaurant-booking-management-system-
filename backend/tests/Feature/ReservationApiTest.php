@@ -164,7 +164,7 @@ class ReservationApiTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
-        $dateTime = Carbon::now()->addDays(1);
+        $dateTime = now()->addDays(1);
         $response = $this->postJson('/api/reservations',
         [
             'reservation_date' => $dateTime->toDateString(),
@@ -175,7 +175,7 @@ class ReservationApiTest extends TestCase
         $response->assertCreated();
 
 
-        $dateTime->addDays(1);
+        $dateTime->addDays(1)->addMinute();
         $reservationId = $response->json('reservation.id');
         $response = $this->patchJson("/api/reservations/{$reservationId}",
         [
@@ -237,7 +237,7 @@ class ReservationApiTest extends TestCase
             ]
         );
         Sanctum::actingAs($user2);
-        $dateTime = Carbon::now()->addDays(1);
+        $dateTime = now()->addDay()->addHour();
 
         $response = $this->patchJson("/api/reservations/{$reservation->id}",
         [
@@ -245,7 +245,9 @@ class ReservationApiTest extends TestCase
             'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 3
         ]);
+        
         $response->assertNotFound();
+
 
         $this->assertDatabaseHas('reservations', 
         [
@@ -274,7 +276,6 @@ class ReservationApiTest extends TestCase
             'reservation_time' => $dateTime->format('H:i:s'),
             'guest_count' => 1
         ]);
-
         $response->assertStatus(409);
 
     }
@@ -609,7 +610,6 @@ class ReservationApiTest extends TestCase
             'id' => $reservationId,
             'status' => 'Cancelled'
         ]);
-        $response->dump();
     }
 
     public function test_completed_reservation_cannot_be_cancelled() : void
@@ -747,5 +747,214 @@ class ReservationApiTest extends TestCase
         ]);
 
 
+    }
+
+    public function test_reservation_cannot_be_updated_to_time_in_the_past() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $originalDateTime = now()->addHours(3);
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $originalDateTime->toDateString(),
+            'reservation_time' => $originalDateTime->format('H:i:s'),
+            'guest_count' => 3
+        ]);
+        $response->assertCreated();
+        $reservationId = $response->json('reservation.id');
+        $dateTime = now()->subHours(4);
+        $response = $this->patchJson("/api/reservations/{$reservationId}",
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format("H:i:s"),
+            'guest_count' => 3
+        ]);
+        $response->assertUnprocessable();
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservationId,
+            'reservation_time' => $originalDateTime->format('H:i:s'),
+            'reservation_date' => $originalDateTime->toDateString(),
+        ]);
+
+
+    }
+
+    public function test_reservation_can_be_updated_excatly_at_deadline() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $baseline = now()->startOfMinute();
+        $this->travelTo($baseline);
+
+        $dateTime = now()->addMinutes(120);
+
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format("H:i:s"),
+            'guest_count' => 3,
+        ]);
+        
+        $response->assertCreated();
+        
+        $reservationId = $response->json('reservation.id');
+        $response = $this->patchJson("/api/reservations/{$reservationId}",
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format("H:i:s"),
+            'guest_count' => 4
+        ]);
+        $response->assertOk();
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservationId,
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format("H:i:s"),
+            'guest_count' => 4
+        ]);
+        
+    }
+
+    public function test_reservation_cannot_be_updated_immediately_after_deadline() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $baseline = now()->startOfMinute();
+        $this->travelTo($baseline);
+        $dateTime = now()->addMinutes(120);
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 3
+        ]);
+        $response->assertCreated();
+        $this->travelTo($baseline->copy()->addMinute());
+        $reservationId = $response->json('reservation.id');
+        $response = $this->patchJson("/api/reservations/{$reservationId}",
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format("H:i:s"),
+            'guest_count' => 2
+        ]);
+        $response->assertConflict();
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservationId,
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 3,
+        ]);
+    }
+
+    public function test_updating_reservation_to_an_overlapping_time() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = now()->addDay()->setTime(18,0,0);
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 3
+        ]);
+        $response->assertCreated();
+        $dateTime->setTime(21,0,0);
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 2
+        ]);
+        $response->assertCreated();
+
+        RestaurantTable::where('status', 'Available')->update(['status' => 'Out of Service']);
+        $reservationId = $response->json('reservation.id');
+
+        $reservationB = Reservation::with('tables')->findOrFail($reservationId);
+        $originalTableIds = $reservationB->tables
+        ->pluck('id')->sort()->values()->all();
+
+        $dateTime->setTime(18,0,0);
+        
+        $response = $this->patchJson("/api/reservations/{$reservationId}",
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 3
+        ]);
+        $response->assertConflict();
+        $dateTime->setTime(21,0,0);
+        $updateReservation = Reservation::with('tables')->findOrFail($reservationId);
+        $updatedTableIds = $updateReservation->tables
+        ->pluck('id')->sort()->values()->all();
+        $this->assertEquals($originalTableIds, $updatedTableIds);
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservationId,
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 2
+        ]);
+       
+    }
+
+    public function test_a_user_can_update_special_requests() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = now()->addDay();
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 4,
+            'special_requests' => null
+        ]);
+        $response->assertCreated();
+        $reservationId = $response->json('reservation.id');
+        $response = $this->patchJson("/api/reservations/{$reservationId}",
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 4,
+            'special_requests' => 'Window seat, please.'
+        ]);
+        $response->assertOk();
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservationId,
+            'special_requests' => 'Window seat, please.'
+        ]);
+    }
+
+    public function test_a_user_can_clear_special_requests() : void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $dateTime = now()->addDay();
+        $response = $this->postJson('/api/reservations',
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 4,
+            'special_requests' => 'Window seat, please.'
+        ]);
+        $response->assertCreated();
+        $reservationId = $response->json('reservation.id');
+        $response = $this->patchJson("/api/reservations/{$reservationId}",
+        [
+            'reservation_date' => $dateTime->toDateString(),
+            'reservation_time' => $dateTime->format('H:i:s'),
+            'guest_count' => 4,
+             'special_requests' => null
+        ]);
+        $response->assertOk();
+        $this->assertDatabaseHas('reservations',
+        [
+            'id' => $reservationId,
+            'special_requests' => null
+        ]);
     }
 }
